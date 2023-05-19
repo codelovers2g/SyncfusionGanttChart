@@ -1,0 +1,255 @@
+
+@using ManProject.Model.Data
+@using mvc.Site.Areas.ManProject.Controllers
+@using mvc.Site.Areas.ManProject
+@using mvc.Site.Areas.MMCDefinition.Controllers
+@using siteComponent.Areas.Dms.Controllers;
+@using siteComponent.SiteControllers;
+@using DMS.Model.Data
+@using Newtonsoft.Json
+@using Utility.WEB.Http
+
+@using mvc.Site.Areas.Utils;
+
+@inject IViewLocalizer localizer;
+@model mvc.Site.Areas.ManProject.ViewModel.pwmProjectPlannerMain
+
+@{
+    string nextOverlayIndex = Model.Overlay.GetNextOverlayIndex();
+
+    string url = @Url.Action(nameof(ProjectPlannerController.GetProjectTasks), ProjectPlannerController.GetControllerName(), new { Area = "ManProject", projectUID = Model.Project_UID });
+    string post = @Url.Action(nameof(ProjectPlannerController.PostProjectTask), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string postProjectTaskWithChangedRowNumber = @Url.Action(nameof(ProjectPlannerController.PostProjectTaskWithChangedRowNumber), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string goToDMS = @Url.Action(nameof(ProjectPlannerController.GetAttachedFiles), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string deleteFile = @Url.Action(nameof(ProjectPlannerController.DeleteFiles), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string downloadFile = @Url.Action(nameof(ProjectPlannerController.DownloadFile), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string deleteTask = @Url.Action(nameof(ProjectPlannerController.DeleteProjectTask), ProjectPlannerController.GetControllerName(), new { Area = "ManProject", projectUID = Model.Project_UID });
+    string deleteMultiTasks = @Url.Action(nameof(ProjectPlannerController.DeleteProjectTasks), ProjectPlannerController.GetControllerName(), new { Area = "ManProject", projectUID = Model.Project_UID });
+    string GetResource = @Url.Action(nameof(ProjectPlannerController.GetResources), ProjectPlannerController.GetControllerName(), new { Area = "ManProject", projectUID = Model.Project_UID });
+    string GetItems = @Url.Action(nameof(ProjectPlannerController.GetComponents), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string goToProjects = @Url.Action(nameof(ProjectController.vProjects), ProjectController.GetControllerName(), new { Area = "MMCDefinition" });
+    string checkUploadFilesStatusUrl = Url.Action(nameof(ProjectPlannerController.CheckUploadFilesStatus), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string uploadUrl = Url.Action(nameof(ProjectPlannerController.UploadFileData), ProjectPlannerController.GetControllerName(), new { Area = "ManProject" });
+    string getHealthURL = @Url.Action(nameof(ProjectPlannerController.GetProjectTasksHealth), ProjectPlannerController.GetControllerName(), new { Area = "ManProject", projectUID = Model.Project_UID });
+    string getBaselineUrl = @Url.Action(nameof(ProjectPlannerController.GetBaseline), ProjectPlannerController.GetControllerName(), new { Area = "ManProject", projectUID = Model.Project_UID });
+
+    string[] taskType = Enum.GetNames(typeof(TaskTypeEnum));
+    string[] taskFunction = Enum.GetNames(typeof(TaskFuncEnum));
+    string[] wholeDay = Enum.GetNames(typeof(WholeDayEnum));
+    var levelNo = LevelNoEnumConv.GetAllStr();
+
+    string ganttDiv = Model.Widget.JS_ElementID("ganttDiv");
+    string cntForm = "cntForm";
+    string cntFormUid = "cntFormUID";
+    string cntProjectUid = "cntProjectUID";    
+    string cntVersionUid = "cntVersionUID";    
+    
+	string cntUploadConfirm = Model.Widget.JS_ElementID( "cntModal" );
+	string cntUploadConfirmBody = Model.Widget.JS_ElementID( "cntConfirmModalBody" );
+
+    string versionUID = Model.Version_UID;
+
+   
+
+
+}
+
+   <style>
+       .e-gantt-container {
+           height: 100%;
+       }
+   
+           .e-gantt-container .e-gantt {
+               height: 100% !important;
+               position: relative;
+               overflow: auto;
+           }
+   
+           .e-gantt-container .e-gantt-toolbar {
+               overflow: hidden;
+               position: sticky;
+               top: 0;
+           }
+   
+       .e-icons {
+           font-size: 1.2rem !important;
+       }
+   
+       .cstm-drpdwn {
+           padding: 13px 0px;
+       }
+   
+       .cstm-e-xl-dlg-container.e-dlg-container .e-popup.e-popup-open.e-dialog {
+           width: calc(100vw - 15vw);
+           max-width: 100% !important;
+           height: calc(100vh - 10vh);
+           max-height: 100% !important;
+       }
+   
+       .cstm-e-xl-dlg-container.e-dlg-container .e-gantt-dialog .e-tab .e-tab-header {
+           position: sticky;
+           top: 0;
+           z-index: 1;
+       }
+   
+       .cstm-e-xl-dlg-container.e-dlg-container .e-tab .e-content,
+       .cstm-e-xl-dlg-container.e-dlg-container .e-tab .e-content > .e-item.e-active,
+       .cstm-e-xl-dlg-container.e-dlg-container .e-gantt-dialog .e-edit-form-row {
+           height: 100% !important;
+       }
+   
+       .e-gantt .e-control.e-toolbar .e-tbar-btn-text {
+           display: none;
+       }
+   
+       .e-icons.e-critical-path:before {
+        content: "\e88b";
+           font-family: 'e-icons' !important;
+       }
+
+    .e-icons.e-sub-total:before {
+           content: "\e88c";
+           font-family: 'e-icons' !important;
+       }
+       
+       .e-icons.e-calendar:before {
+           content: "\e75e";
+           font-family: 'e-icons' !important;
+       }
+   
+       #tooltip {
+           background: cornsilk;
+           border: 1px solid black;
+           border-radius: 5px;
+           padding: 5px;
+       }
+   </style>
+  
+   <script id="template" type="text/x-template">            
+      <div class="template_checkbox">
+              ${if(Health == 'positive')}
+              <svg width="30" height="30">
+                  <title id="unique-id">${taskData.HealthMessage}</title>
+              <circle cx="15" cy="15" r="8"
+              stroke="white" stroke-width="0" fill="green"  />
+              Sorry, your browser does not support inline SVG.
+              </svg>
+          ${else if(Health == 'negative')}
+              <svg width="30" height="30">
+                  <title id="unique-id">${taskData.HealthMessage}</title>
+              <circle cx="15" cy="15" r="8"
+              stroke="white" stroke-width="0" fill="red" />
+              Sorry, your browser does not support inline SVG.
+              </svg>
+          ${else if(Health == 'neutral')}
+              <svg width="30" height="30">
+                  <title id="unique-id">${taskData.HealthMessage}</title>
+              <circle cx="15" cy="15" r="8"
+              stroke="white" stroke-width="0" fill="yellow" />
+              Sorry, your browser does not support inline SVG.
+              </svg>
+          ${/if}
+      </div>
+   </script>
+
+
+
+   <div id="Gantt" style="height:100%" class="">
+       <div id="Grid"></div>
+   </div>
+    
+   <div class="loadpanel"></div>
+   <div class="loadpanel1"></div>
+   
+   <div id="baselinePopup">
+       <div id="baselinePopupDiv"></div>
+   </div>
+   
+   <div class="row gy-3" id="baselineDiv" style="display:none;">
+       <div class="form-group col-11 col-sm-11 me-2">
+           <vc:combo-box id="baseline" asp-for="Header.UID" validate="false" title-key="@localizer["T-M-ProjectPlanner-Baseline-tt"]"
+                      css-class="form-control @ViewData.GetBSValidationStyle("Header.UID")" items="GenericViewUtils.GetBaselineComboBoxItems(Model.AllBaselines.ToList(),versionUID, Model.FuncBaselinePresenter)" js-func-item-selection-changed="@string.Empty"></vc:combo-box>
+           <span asp-validation-for="Header.UID" class="invalid-feedback" id="DisplayNameError"></span>
+   
+       </div>
+   </div>
+   
+   <div id="projectplannerversion">
+       <form id=@cntForm class="needs-validation" novalidate>
+           <input id=@cntFormUid type="hidden" asp-for="Header.UID" />
+           <input id=@cntProjectUid type="hidden" asp-for="Header.ProjectUID" />
+           <input id=@cntVersionUid type="hidden" asp-for="@Model.Version_UID" />
+           <div class="row gy-3">
+               <div id="displaynamediv" class="form-group col-12 col-sm-12">
+                   <label class="lblRequired" asp-for="Header.DisplayName" title="@localizer["T-M-ProjectPlanner-DisplayName-tt"]">@localizer["T-M-ProjectPlanner-DisplayName"]</label>
+                   <input class="form-control" type="text" asp-for="Header.DisplayName">
+                   <span asp-validation-for="Header.DisplayName" class="invalid-feedback"></span>
+               </div>
+   
+               <div id="descriptiondiv" class="form-group col-12 col-sm-12">
+                   <label class="lblRequired" asp-for="Header.Description" title="@localizer["T-M-ProjectPlanner-Description-tt"]">@localizer["T-M-ProjectPlanner-Description"]</label>
+                   <input class="form-control" type="text" asp-for="Header.Description">
+                   <span asp-validation-for="Header.Description" class="invalid-feedback"></span>
+               </div>
+           </div>
+   
+       </form>
+       <div class="col-12 mb-4 mt-4 d-flex flex-wrap justify-content-end p-2">
+           <button id="Baselinebutton" class="btn btn-primary me-2" onclick="submitBaseline(this)">Save</button>
+           <button id="projectplannerversionbutton" class="btn btn-primary me-2" onclick="submitProjectPlannerVersion(this)">Save</button>
+           <button class="btn btn-secondary" onclick="popup?.hide()">Cancel</button>
+       </div>
+   </div>
+   
+   <div class="modal fade" id="@cntUploadConfirm" data-bs-backdrop="false">
+   	    <script>
+   	    	'use strict';
+   	    	{
+   	    		document.getElementById('@cntUploadConfirm').ShowConfirm = (msgHtml, fOverwrite, fUploadNew, fCancel) => {
+   	    			
+   	    			document.getElementById('@cntUploadConfirm').Overwrite = fOverwrite;
+   	    			document.getElementById('@cntUploadConfirm').UploadNew = fUploadNew;
+   	    			document.getElementById('@cntUploadConfirm').Cancel = fCancel;
+   
+   	    			document.getElementById('@cntUploadConfirmBody').innerHTML = msgHtml;
+   	    										
+   	    			$('#@cntUploadConfirm').modal({ keyboard: false })   
+   	    			$('#@cntUploadConfirm').modal('show') 
+   	    		}
+   	    	}
+   	    </script>
+   	    <div class="modal-dialog">
+   	    	<div class="modal-content">
+   	    		<div class="modal-header" style="border-bottom:0px;">
+   	    			<h5 class="modal-title">@localizer["T-VC-pwDmsUploadFilesForm-ConfirmHeader"]</h5> 
+   	    		</div>
+   	    		<div class="modal-body" style="padding-bottom:2rem;">
+   	    			<form>
+   	    				<div class="form-group">
+   	    				   <span id="@cntUploadConfirmBody"></span>
+   	    				</div>
+   	    			</form>
+   	    		</div>
+   	    		<div class="modal-footer" style="border-top:0px;">
+   	    			<button class="btn btn-outline-dark text-truncate" style="min-width:6em" type="button" data-bs-dismiss="modal" 
+   	    					title="@localizer["T-VC-pwDmsUploadFilesForm-ConfirmBtnOverwrite-tt"]"
+   	    					onclick="document.getElementById('@cntUploadConfirm').Overwrite?.()">
+   	    					@localizer["T-VC-pwDmsUploadFilesForm-ConfirmBtnOverwrite"]
+   	    			</button>
+   	    			<button class="btn btn-outline-dark text-truncate" style="min-width:6em" type="button" data-bs-dismiss="modal" 
+   	    					title="@localizer["T-VC-pwDmsUploadFilesForm-ConfirmBtnAddNewText-tt"]"
+   	    					onclick="document.getElementById('@cntUploadConfirm').UploadNew?.()">
+   	    					@localizer["T-VC-pwDmsUploadFilesForm-ConfirmBtnAddNewText"]
+   	    					
+   	    			</button>
+   	    			<button class="btn btn-outline-dark text-truncate" style="min-width:6em" type="button" data-bs-dismiss="modal" 
+   	    					title="@localizer["T-VC-pwDmsUploadFilesForm-ConfirmBtnCancel-tt"]"
+   	    					onclick="document.getElementById('@cntUploadConfirm').Cancel?.()">
+   	    				@localizer["T-VC-pwDmsUploadFilesForm-ConfirmBtnCancel"] 
+   	    			</button>
+   	    		</div>
+   	    	</div>
+   	    </div>
+   	</div>
+	
+<script src="ProjectPlanner.js"></script>
